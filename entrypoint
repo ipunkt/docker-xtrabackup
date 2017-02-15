@@ -29,11 +29,11 @@ else
 
 	if [ ! -d "$TARGET" ] ; then
 		echo "$TARGET does not exist yet, creating"
-		echo mkdir -p "$TARGET"
+		mkdir -p "$TARGET"
 	fi
 
 	echo "Creating backup in $TARGET"
-	echo xtrabackup --backup --datadir /var/lib/mysql \
+	xtrabackup --backup --datadir /var/lib/mysql \
 		--target-dir="$TARGET" --host "$MYSQL_HOST" \
 		${USER[@]} ${PASSWORD[@]}
 fi
