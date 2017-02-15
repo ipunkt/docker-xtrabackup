@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 if [ -z "$MYSQL_USER" ] ; then
 	echo "WARNING: Running with default user."
 else
@@ -34,9 +36,14 @@ else
 	fi
 
 	echo "Creating backup in $TARGET"
+
+	# Backup - copies innodb files and reads binary log while doing so
 	xtrabackup --backup --datadir /var/lib/mysql \
 		--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
 		--host "$MYSQL_HOST" \
+	# First prepare - selfheal innodb and apply binary log to make it consistent
+	xtrabackup --prepare --target-dir="$TARGET"
+	# Second prepare - write logfiles for faster server startup
 	xtrabackup --prepare --target-dir="$TARGET"
 fi
 
