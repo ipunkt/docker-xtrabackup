@@ -34,8 +34,9 @@ else
 	fi
 
 	echo "Creating backup in $TARGET"
-	echo xtrabackup --backup --datadir /var/lib/mysql \
-		--target-dir="$TARGET" --host "$MYSQL_HOST" \
-		${USER[@]} ${PASSWORD[@]}
+	xtrabackup --backup --datadir /var/lib/mysql \
+		--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+		--host "$MYSQL_HOST" \
+	xtrabackup --prepare --target-dir="$TARGET"
 fi
 
