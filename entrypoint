@@ -1,0 +1,40 @@
+#!/bin/bash
+
+if [ -z "$MYSQL_USER" ] ; then
+	echo "WARNING: Running with default user."
+else
+	echo "Connecting as $MYSQL_USER"
+	USER=(--user "$MYSQL_USER")
+fi
+
+if [ -z "$MYSQL_PASSWORD" ] ; then
+	echo "WARNING: Running without password."
+else
+	echo "Connecting with password"
+	PASSWORD=(--password "$MYSQL_PASSWORD")
+fi
+
+if [ -z "$MYSQL_HOST" ] ; then
+	echo "WARNING: Connecting to default host 'source', make sure to set links"
+else
+	echo "Connecting to host"
+fi
+
+
+if [ "$#" -gt "0" ] ; then
+	echo $*
+else
+	DATE=$(date '+%Y-%m-%d-%H_%M')
+	TARGET="/target/$DATE"
+
+	if [ ! -d "$TARGET" ] ; then
+		echo "$TARGET does not exist yet, creating"
+		echo mkdir -p "$TARGET"
+	fi
+
+	echo "Creating backup in $TARGET"
+	echo xtrabackup --backup --datadir /var/lib/mysql \
+		--target-dir="$TARGET" --host "$MYSQL_HOST" \
+		${USER[@]} ${PASSWORD[@]}
+fi
+
