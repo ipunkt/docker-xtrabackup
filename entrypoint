@@ -16,6 +16,7 @@ fi
 
 if [ -z "$MYSQL_HOST" ] ; then
 	echo "WARNING: Connecting to default host 'source', make sure to set links"
+	MYSQL_HOST="target"
 else
 	echo "Connecting to host"
 fi
@@ -33,7 +34,7 @@ else
 	fi
 
 	echo "Creating backup in $TARGET"
-	xtrabackup --backup --datadir /var/lib/mysql \
+	echo xtrabackup --backup --datadir /var/lib/mysql \
 		--target-dir="$TARGET" --host "$MYSQL_HOST" \
 		${USER[@]} ${PASSWORD[@]}
 fi
