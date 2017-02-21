@@ -2,55 +2,130 @@
 
 set -e
 
-if [ -z "$MYSQL_USER" ] ; then
-	echo "WARNING: Running with default user."
-else
-	echo "Connecting as $MYSQL_USER"
-	USER=(--user "$MYSQL_USER")
-fi
+TARGET_PREFIX="/target"
 
-if [ -z "$MYSQL_PASSWORD" ] ; then
-	echo "WARNING: Running without password."
-else
-	echo "Connecting with password"
-	PASSWORD=(--password "$MYSQL_PASSWORD")
-fi
-
-if [ -z "$MYSQL_HOST" ] ; then
-	echo "WARNING: Connecting to default host 'source', make sure to set links"
-	MYSQL_HOST="target"
-else
-	echo "Connecting to host $MYSQL_HOST"
-fi
-
-if [ -z "$MYSQL_PORT" ] ; then
-	MYSQL_PORT="3306"
-	echo "WARNING: Connecting to default port '3306'"
-else
-	echo "Connecting to port $MYSQL_PORT"
-fi
-
-
-if [ "$#" -gt "0" ] ; then
-	echo $*
-else
-	DATE=$(date '+%Y-%m-%d-%H_%M')
-	TARGET="/target/$DATE"
-
-	if [ ! -d "$TARGET" ] ; then
-		echo "$TARGET does not exist yet, creating"
-		mkdir -p "$TARGET"
+setDefaults() {
+	if [ -z "$MYSQL_USER" ] ; then
+		echo "WARNING: Running with default user."
+	else
+		echo "Connecting as $MYSQL_USER"
+		USER=(--user "$MYSQL_USER")
 	fi
 
-	echo "Creating backup in $TARGET"
+	if [ -z "$MYSQL_PASSWORD" ] ; then
+		echo "WARNING: Running without password."
+	else
+		echo "Connecting with password"
+		PASSWORD=(--password "$MYSQL_PASSWORD")
+	fi
 
-	# Backup - copies innodb files and reads binary log while doing so
-	xtrabackup --backup --datadir /var/lib/mysql \
-		--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
-		--host "$MYSQL_HOST" --port $MYSQL_PORT \
-	# First prepare - selfheal innodb and apply binary log to make it consistent
-	xtrabackup --prepare --target-dir="$TARGET"
-	# Second prepare - write logfiles for faster server startup
-	xtrabackup --prepare --target-dir="$TARGET"
-fi
+	if [ -z "$MYSQL_HOST" ] ; then
+		echo "WARNING: Connecting to default host 'source', make sure to set links"
+		MYSQL_HOST="target"
+	else
+		echo "Connecting to host $MYSQL_HOST"
+	fi
 
+	if [ -z "$MYSQL_PORT" ] ; then
+		MYSQL_PORT="3306"
+		echo "WARNING: Connecting to default port '3306'"
+	else
+		echo "Connecting to port $MYSQL_PORT"
+	fi
+
+}
+
+usage() {
+	echo "======================================================================"
+	echo "= Usage"
+	echo "======================================================================"
+	echo "docker run ipunktbs/xtrabackup -v "name-backup-directory:${TARGET_PREFIX}" [COMMAND]"
+	echo ""
+	echo "The ipunktbs/xtrabackup docker image tries to provide percona xtrabackup for use in rancher environments"
+	echo ""
+
+
+	echo "======================================================================"
+	echo "= Commands"
+	echo "======================================================================"
+	echo "- backup"
+	echo "  Does a backup, prepare, prepare cycle from /var/lib/mysql to ${TARGET_PREFIX}/YY-mm-dd-HH_ii"
+	echo ""
+	echo "- restore YY-mm-dd-HH_ii"
+	echo "  Does a copy-back ${TARGET_PREFIX}/YY-mm-dd-HH_ii to /var/lib/mysql"
+	echo ""
+	echo "- run COMMAND"
+	echo "  Runs the given command within the container."
+}
+
+
+case $1 in
+	backup)
+
+		DATE=$(date '+%Y-%m-%d-%H_%M')
+		TARGET="${TARGET_PREFIX}/$DATE"
+
+		echo "======================================================================"
+		echo "= Starting backup process to $TARGET"
+		echo "======================================================================"
+		echo ""
+
+		setDefaults
+
+		if [ ! -d "$TARGET" ] ; then
+			echo "$TARGET does not exist yet, creating"
+			mkdir -p "$TARGET"
+		fi
+
+		echo "Creating backup in $TARGET"
+
+		# Backup - copies innodb files and reads binary log while doing so
+		xtrabackup --backup --datadir /var/lib/mysql \
+			--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+			--host "$MYSQL_HOST" --port $MYSQL_PORT \
+			# First prepare - selfheal innodb and apply binary log to make it consistent
+		xtrabackup --prepare --target-dir="$TARGET"
+		# Second prepare - write logfiles for faster server startup
+		xtrabackup --prepare --target-dir="$TARGET"
+		;;
+
+	restore)
+		shift
+		TARGET="${TARGET_PREFIX}/$1"
+
+		echo "======================================================================"
+		echo "= Starting restore process from $TARGET"
+		echo "======================================================================"
+		echo ""
+
+		if [ -z "$1" ] ; then
+
+			usage
+
+			echo "E> Error: no target backup given to"
+			exit 1
+		fi
+
+		if [ ! -d "$TARGET" ] ; then
+			echo "E> Directory '$TARGET' does not exist. Backup restore failed."
+			exit 2
+		fi
+
+		xtrabackup --copy-back --target-dir="$TARGET"
+
+		;;
+	run)
+		shift
+		$*
+		;;
+	help)
+		shift
+		usage $*
+		exit 0
+		exit 0
+		;;
+	*)
+		usage
+		exit 0
+		;;
+esac
