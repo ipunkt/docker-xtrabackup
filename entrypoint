@@ -3,6 +3,7 @@
 set -e
 
 TARGET_PREFIX="/target"
+DATA_DIRECTORY="/var/lib/mysql"
 
 setDefaults() {
 	if [ -z "$MYSQL_USER" ] ; then
@@ -80,7 +81,7 @@ case $1 in
 		echo "Creating backup in $TARGET"
 
 		# Backup - copies innodb files and reads binary log while doing so
-		xtrabackup --backup --datadir /var/lib/mysql \
+		xtrabackup --backup --datadir="$DATA_DIRECTORY" \
 			--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
 			--host "$MYSQL_HOST" --port $MYSQL_PORT \
 			# First prepare - selfheal innodb and apply binary log to make it consistent
@@ -111,7 +112,7 @@ case $1 in
 			exit 2
 		fi
 
-		xtrabackup --copy-back --target-dir="$TARGET"
+		xtrabackup --copy-back --datadir="$DATA_DIRECTORY" --target-dir="$TARGET"
 		echo "Done"
 
 		;;
