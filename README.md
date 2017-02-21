@@ -39,8 +39,9 @@ command will prompt the container to print its usage information.
   Print Usage
 
 ### backup
+
 | Environment variable | xtradebug parameter | defaults to |
-| ==================== | =================== | =========== |
+| -------------------- | ------------------- | ----------- |
 | MYSQL\_HOST | --host $PARAM | target |
 | MYSQL\_PORT | --port $PARAM | 3306 |
 | MYSQL\_USER | --user $PARAM | - |
@@ -69,11 +70,13 @@ Currently only prints the full overview.
 help [COMMAND] might be included in the future if the need arises
 
 ## Example
-- Step 1: Create backup from existing data which is not within
-	```shell
+- Step 1: Create backup from existing data which is not within  
+	
+	```sh
 	docker volume create --driver=convoy --name=backup
 	docker run -it --volumes-from DB_DATA_VOLUME_CONTAINER -v backup:/target --link DB_SERVER_CONTAINER:target -e MYSQL\_PORT=3306 -e MYSQL\_USER=root -e MYSQL_PASSWORD='PASSWORD' ipunktbs/xtrabackup
 	```
+	
 - Step 2: Create new PXC cluster from Rancher Catalog
 - Step 3: Upgrade PXC service to match your scheduling needs
 - Step 4: Stop PXC service
