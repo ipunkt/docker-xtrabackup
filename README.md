@@ -40,7 +40,7 @@ command will prompt the container to print its usage information.
 
 ### backup
 
-| Environment variable | xtradebug parameter | defaults to |
+| Environment variable | xtrabackup parameter | defaults to |
 | -------------------- | ------------------- | ----------- |
 | MYSQL\_HOST | --host $PARAM | target |
 | MYSQL\_PORT | --port $PARAM | 3306 |
