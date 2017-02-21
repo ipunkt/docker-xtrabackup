@@ -120,7 +120,6 @@ case $1 in
 		echo "= Starting clear process for /var/lib/mysql"
 		echo "======================================================================"
 		echo ""
-		echo $*
 
 		if [ "$2" != "yes" ] ; then
 			echo "Clearing not confirmed. Please add 'yes' as parameter"
