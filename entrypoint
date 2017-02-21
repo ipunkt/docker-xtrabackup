@@ -20,7 +20,14 @@ if [ -z "$MYSQL_HOST" ] ; then
 	echo "WARNING: Connecting to default host 'source', make sure to set links"
 	MYSQL_HOST="target"
 else
-	echo "Connecting to host"
+	echo "Connecting to host $MYSQL_HOST"
+fi
+
+if [ -z "$MYSQL_PORT" ] ; then
+	MYSQL_PORT="3306"
+	echo "WARNING: Connecting to default port '3306'"
+else
+	echo "Connecting to port $MYSQL_PORT"
 fi
 
 
@@ -40,7 +47,7 @@ else
 	# Backup - copies innodb files and reads binary log while doing so
 	xtrabackup --backup --datadir /var/lib/mysql \
 		--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
-		--host "$MYSQL_HOST" \
+		--host "$MYSQL_HOST" --port $MYSQL_PORT \
 	# First prepare - selfheal innodb and apply binary log to make it consistent
 	xtrabackup --prepare --target-dir="$TARGET"
 	# Second prepare - write logfiles for faster server startup
