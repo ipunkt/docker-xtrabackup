@@ -120,11 +120,10 @@ case $1 in
 		echo "= Starting clear process for /var/lib/mysql"
 		echo "======================================================================"
 		echo ""
+		echo $*
 
-		shift
-		
-		if [ "$1" != "yes" ] ; then
-			echo "Clearing not confirmed. Please add `yes` as parameter"
+		if [ "$2" != "yes" ] ; then
+			echo "Clearing not confirmed. Please add 'yes' as parameter"
 			echo "Example: docker run ipunktbs/xtrabackup clear yes"
 			exit 1
 		fi
