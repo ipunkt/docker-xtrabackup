@@ -112,11 +112,37 @@ case $1 in
 		fi
 
 		xtrabackup --copy-back --target-dir="$TARGET"
+		echo "Done"
 
+		;;
+	clear)
+		echo "======================================================================"
+		echo "= Starting clear process for /var/lib/mysql"
+		echo "======================================================================"
+		echo ""
+
+		shift
+		
+		if [ "$1" != "yes" ] ; then
+			echo "Clearing not confirmed. Please add `yes` as parameter"
+			echo "Example: docker run ipunktbs/xtrabackup clear yes"
+			exit 1
+		fi
+
+		echo "Clearing confirmed, starting"
+		rm -Rfv /var/lib/mysql/*
+		echo "Done"
 		;;
 	run)
 		shift
+
+		echo "======================================================================"
+		echo "= Starting command $*"
+		echo "======================================================================"
+		echo ""
+
 		$*
+		echo "Done"
 		;;
 	help)
 		shift
@@ -129,3 +155,4 @@ case $1 in
 		exit 0
 		;;
 esac
+
