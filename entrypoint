@@ -51,6 +51,8 @@ usage() {
 	echo "======================================================================"
 	echo "- backup"
 	echo "  Does a backup, prepare, prepare cycle from /var/lib/mysql to ${TARGET_PREFIX}/YY-mm-dd-HH_ii"
+	echo "  If the environment variable RUN_EVERY is set then backups will continue to be made, with"
+	echo " 'sleep \$RUN_EVERY' in between"
 	echo ""
 	echo "- restore YY-mm-dd-HH_ii"
 	echo "  Does a copy-back ${TARGET_PREFIX}/YY-mm-dd-HH_ii to /var/lib/mysql"
@@ -63,31 +65,52 @@ usage() {
 case $1 in
 	backup)
 
-		DATE=$(date '+%Y-%m-%d-%H_%M')
-		TARGET="${TARGET_PREFIX}/$DATE"
 
-		echo "======================================================================"
-		echo "= Starting backup process to $TARGET"
-		echo "======================================================================"
-		echo ""
+		RUNNING="true"
+		while [ "$RUNNING" = "true" ] ; do
 
-		setDefaults
 
-		if [ ! -d "$TARGET" ] ; then
-			echo "$TARGET does not exist yet, creating"
-			mkdir -p "$TARGET"
-		fi
+			DATE=$(date '+%Y-%m-%d-%H%M%S')
+			TARGET="${TARGET_PREFIX}/$DATE"
 
-		echo "Creating backup in $TARGET"
+			echo "======================================================================"
+			echo "= Starting backup process to $TARGET"
+			echo "======================================================================"
+			echo ""
 
-		# Backup - copies innodb files and reads binary log while doing so
-		xtrabackup --backup --datadir="$DATA_DIRECTORY" \
-			--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
-			--host "$MYSQL_HOST" --port $MYSQL_PORT \
-			# First prepare - selfheal innodb and apply binary log to make it consistent
-		xtrabackup --prepare --target-dir="$TARGET"
-		# Second prepare - write logfiles for faster server startup
-		xtrabackup --prepare --target-dir="$TARGET"
+			setDefaults
+
+			if [ ! -d "$TARGET" ] ; then
+				echo "$TARGET does not exist yet, creating"
+				mkdir -p "$TARGET"
+			fi
+
+			echo "Creating backup in $TARGET"
+
+			# Backup - copies innodb files and reads binary log while doing so
+			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
+				--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+				--host "$MYSQL_HOST" --port $MYSQL_PORT \
+				# First prepare - selfheal innodb and apply binary log to make it consistent
+			xtrabackup --prepare --target-dir="$TARGET"
+			# Second prepare - write logfiles for faster server startup
+			xtrabackup --prepare --target-dir="$TARGET"
+			echo "$TARGET Done"
+
+			if [ ! -z "RUN_EVERY" ] ; then
+
+				echo "Sleeping for $RUN_EVERY before starting again"
+				sleep "$RUN_EVERY"
+
+			else
+
+				echo "Environment variable RUN_EVERY was not set, not looping"
+				RUNNING="false"
+
+			fi
+
+
+		done 
 		;;
 
 	restore)
