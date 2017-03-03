@@ -68,7 +68,7 @@ backupRancher() {
 
 	$RANCHER_CLI_DIRECTORY/rancher export "${STACK}"
 	cp ${STACK}/{docker,rancher}-compose.yml "${TARGET_DIRECTORY}/"
-	echo "{"stack":${STACK},"service":${SERVICE}}" > "${TARGET_DIRECTORY}/backup.json"
+	echo "{\"stack\":\"${STACK}\",\"service\":\"${SERVICE}\"}" > "${TARGET_DIRECTORY}/backup.json"
 }
 
 usage() {
