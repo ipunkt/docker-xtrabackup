@@ -120,7 +120,7 @@ case $1 in
 
 			echo "Creating backup in $TARGET"
 
-			backupComposer $TARGET
+			backupRancher $TARGET
 
 			# Backup - copies innodb files and reads binary log while doing so
 			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
