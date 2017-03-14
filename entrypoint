@@ -5,6 +5,38 @@ set -e
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
+create() {
+
+	TARGET_BACKUP="$1"
+
+	if [ -z "$RESTORE_STACK" ] ; then
+		echo "RESTORE_STACK environment variable not set, not creating a restore service"
+		return
+	fi
+
+	OLDDIR=$(pwd)
+
+	cd /tmp/
+	curl http://rancher-metadata/2015-12-19/self/service/metadata/docker-compose \
+	 	> /tmp/docker-compose.yml.tpl
+
+	ESCAPED_RANCHER_URL=$(echo ${RANCHER_URL} | sed -e 's/[\/&]/\\&/g')
+	sed \
+		-e "s~%%BACKUP%%~$TARGET_BACKUP~" \
+		-e "s~%%RANCHER_URL%%~$ESCAPED_RANCHER_URL~" \
+		-e "s~%%RANCHER_KEY%%~$RANCHER_ACCESS_KEY~" \
+		-e "s~%%RANCHER_SECRET%%~$RANCHER_ACCESS_SECRET~" \
+		-e "s~%%BACKUP_VOLUME%%~$BACKUP_VOLUME~" \
+		-e "s~%%BACKUP_DRIVER%%~$BACKUP_DRIVER~" \
+		-e "s~%%STORAGEBOX_URL%%~$STORAGEBOX_URL~" \
+		-e "s~%%STORAGEBOX_USER%%~$STORAGEBOX_USER~" \
+		-e "s~%%STORAGEBOX_PASSWORD%%~$STORAGEBOX_PASSWORD~" \
+	  	/tmp/docker-compose.yml.tpl > /tmp/docker-compose.yml
+	rancher-compose -p "$RESTORE_STACK" create
+
+	cd "$OLDDIR"
+}
+
 setDefaults() {
 	if [ -z "$MYSQL_USER" ] ; then
 		echo "WARNING: Running with default user."
@@ -134,6 +166,8 @@ case $1 in
 			xtrabackup --prepare --target-dir="$TARGET"
 			echo "$TARGET Done"
 
+			create "$DATE"
+
 			if [ ! -z "RUN_EVERY" ] ; then
 
 				echo "Sleeping for $RUN_EVERY before starting again"
@@ -176,6 +210,18 @@ case $1 in
 		echo "Done"
 
 		;;
+	create)
+		shift
+		TARGET="$1"
+
+		echo "======================================================================"
+		echo "= Creating restore service from $TARGET"
+		echo "======================================================================"
+		echo ""
+
+		create "$TARGET"
+		;;
+
 	clear)
 		echo "======================================================================"
 		echo "= Starting clear process for /var/lib/mysql"
