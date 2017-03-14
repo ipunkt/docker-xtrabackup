@@ -5,6 +5,28 @@ set -e
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
+download_rancher_compose() {
+
+	RANCHER_COMPOSE_VERSION="$1"
+
+	if [ -z "${RANCHER_COMPOSE_VERSION}" ] ; then
+		RANCHER_COMPOSE_VERSION="0.12.2"
+	fi
+
+	RANCHER_COMPOSE="rancher-compose-${RANCHER_COMPOSE_VERSION}"
+	TARGET_RANCHER_COMPOSE="/usr/local/bin/$RANCHER_COMPOSE"
+	if [ ! -f "$TARGET_RANCHER_COMPOSE" ] ; then
+		echo "rancher-compose version $RANCHER_COMPOSE_VERSION not found. Downloading."
+		curl "https://releases.rancher.com/compose/v${RANCHER_COMPOSE_VERSION}/rancher-compose-linux-amd64-v${RANCHER_COMPOSE_VERSION}.tar.gz" \
+			| gunzip | tar -C /tmp -x
+		cp /tmp/rancher-compose-v${RANCHER_COMPOSE_VERSION}/rancher-compose "$TARGET_RANCHER_COMPOSE"
+		chmod +x "$TARGET_RANCHER_COMPOSE"
+		echo "Installed Rancher compose $RANCHER_COMPOSE_VERSION to $TARGET_RANCHER_COMPOSE"
+	fi
+
+	echo ${RANCHER_COMPOSE}
+}
+
 createRestoreService() {
 
 	TARGET_BACKUP="$1"
@@ -37,7 +59,9 @@ createRestoreService() {
 		-e "s~%%STORAGEBOX_USER%%~$STORAGEBOX_USER~" \
 		-e "s~%%STORAGEBOX_PASSWORD%%~$STORAGEBOX_PASSWORD~" \
 	  	/tmp/docker-compose.yml.tpl > /tmp/docker-compose.yml
-	rancher-compose -p "$RESTORE_STACK" create
+	RANCHER_COMPOSE=`download_rancher_compose "$RANCHER_COMPOSE_VERSION"`
+
+	${RANCHER_COMPOSE} -p "$RESTORE_STACK" create
 
 	cd "$OLDDIR"
 }
