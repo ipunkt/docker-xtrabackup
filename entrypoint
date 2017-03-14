@@ -5,7 +5,7 @@ set -e
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
-create() {
+createRestoreService() {
 
 	TARGET_BACKUP="$1"
 
@@ -166,7 +166,7 @@ case $1 in
 			xtrabackup --prepare --target-dir="$TARGET"
 			echo "$TARGET Done"
 
-			create "$DATE"
+			createRestoreService "$DATE"
 
 			if [ ! -z "RUN_EVERY" ] ; then
 
@@ -219,7 +219,7 @@ case $1 in
 		echo "======================================================================"
 		echo ""
 
-		create "$TARGET"
+		createRestoreService "$TARGET"
 		;;
 
 	clear)
