@@ -46,7 +46,7 @@ createRestoreService() {
 	 	> /tmp/docker-compose.yml.tpl
 
 	ESCAPED_RANCHER_URL=$(echo ${RANCHER_URL} | sed -e 's/[\/&]/\\&/g')
-	ALPHANUM_TARGET_BACKUP=$(echo ${TARGET_BACKUP} | sed -e 's/[^a-zA-Z0-9]//g')
+	ALPHANUM_TARGET_BACKUP=$(echo ${TARGET_BACKUP} | sed -e 's/[^a-zA-Z0-9\-]//g')
 	sed \
 		-e "s~%%BACKUP%%~$TARGET_BACKUP~" \
 		-e "s~%%BACKUP_ALPHANUM%%~$ALPHANUM_TARGET_BACKUP~" \
@@ -61,7 +61,7 @@ createRestoreService() {
 	  	/tmp/docker-compose.yml.tpl > /tmp/docker-compose.yml
 	download_rancher_compose $RANCHER_COMPOSE_VERSION
 
-	echo "Using ${RANCHER_COMPOSE} as rancher-compose executable"
+	echo "Using ${ANCHER_COMPOSE} as rancher-compose executable"
 	${RANCHER_COMPOSE} -p "$RESTORE_STACK" create
 
 	cd "$OLDDIR"
