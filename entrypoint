@@ -48,8 +48,10 @@ createRestoreService() {
 	 	> /tmp/docker-compose.yml.tpl
 
 	ESCAPED_RANCHER_URL=$(echo ${RANCHER_URL} | sed -e 's/[\/&]/\\&/g')
+	ALPHANUM_TARGET_BACKUP=$(echo ${TARGET_BACKUP} | sed -e 's/[^a-zA-Z0-9]//g')
 	sed \
 		-e "s~%%BACKUP%%~$TARGET_BACKUP~" \
+		-e "s~%%BACKUP_ALPHANUM%%~$ALPHANUM_TARGET_BACKUP~" \
 		-e "s~%%RANCHER_URL%%~$ESCAPED_RANCHER_URL~" \
 		-e "s~%%RANCHER_KEY%%~$RANCHER_ACCESS_KEY~" \
 		-e "s~%%RANCHER_SECRET%%~$RANCHER_ACCESS_SECRET~" \
