@@ -14,6 +14,11 @@ createRestoreService() {
 		return
 	fi
 
+	echo "======================================================================"
+	echo "= Creating restore service for $TARGET_BACKUP"
+	echo "======================================================================"
+	echo ""
+
 	OLDDIR=$(pwd)
 
 	cd /tmp/
