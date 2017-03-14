@@ -23,8 +23,6 @@ download_rancher_compose() {
 		chmod +x "$TARGET_RANCHER_COMPOSE"
 		echo "Installed Rancher compose $RANCHER_COMPOSE_VERSION to $TARGET_RANCHER_COMPOSE"
 	fi
-
-	echo ${RANCHER_COMPOSE}
 }
 
 createRestoreService() {
@@ -61,8 +59,9 @@ createRestoreService() {
 		-e "s~%%STORAGEBOX_USER%%~$STORAGEBOX_USER~" \
 		-e "s~%%STORAGEBOX_PASSWORD%%~$STORAGEBOX_PASSWORD~" \
 	  	/tmp/docker-compose.yml.tpl > /tmp/docker-compose.yml
-	RANCHER_COMPOSE=`download_rancher_compose "$RANCHER_COMPOSE_VERSION"`
+	download_rancher_compose $RANCHER_COMPOSE_VERSION
 
+	echo "Using ${$RANCHER_COMPOSE} as rancher-compose executable"
 	${RANCHER_COMPOSE} -p "$RESTORE_STACK" create
 
 	cd "$OLDDIR"
