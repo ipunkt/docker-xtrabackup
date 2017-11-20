@@ -15,7 +15,7 @@ TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
 find_last_full_backup() {
-	FILES=( $(ls $TARGET/full-????-??-??) )
+	FILES=( $(ls -d $TARGET/full-????-??-??-??????) )
 	echo ${FILES[-1]}
 }
 
@@ -326,7 +326,7 @@ case $1 in
 		echo "======================================================================"
 		echo ""
 
-		FILES=( $(ls $TARGET/full-????-??-??) )
+		FILES=( $(ls -d $TARGET/full-????-??-??-??????) )
 		exit 0
 		;;
 	run)
