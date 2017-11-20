@@ -9,6 +9,7 @@ set -e
 # - INCREMENTAL: Create ${TARGET_PREFIX}/full-{LASTDATE}-inc-${DATE} based on the last full-${DATE}
 #
 MODE="${MODE:-SIMPLE}"
+RUN_EVERY="${RUN_EVERY:-}"
 
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
@@ -171,98 +172,100 @@ usage() {
 	echo "  Runs the given command within the container."
 }
 
+backup() {
+
+	RUNNING="true"
+	while [ x"$RUNNING" = x"true" ] ; do
+
+		DATE=$(date '+%Y-%m-%d-%H%M%S')
+		NAME="${DATE}"
+
+		if [ x"${MODE}" = x"FULL" ] ; then
+			echo "======================================================================"
+			echo "= Full backup process"
+			echo "======================================================================"
+			echo ""
+
+			NAME="full-${DATE}"
+		fi
+
+		if [ x"${MODE}" = x"INCREMENTAL" ] ; then
+			echo "======================================================================"
+			echo "= Incremental backup process"
+			echo "======================================================================"
+			echo ""
+			BASE_BACKUP="$(find_last_full_backup)"
+			BASE_PATH="${TARGET_PREFIX}/${BASE_BACKUP}"
+			NAME="full-${BASE_BACKUP}-inc-$DATE"
+			echo "Base backup: ${BASE_BACKUP}"
+			echo ""
+		fi
+
+		TARGET="${TARGET_PREFIX}/$NAME"
+
+		echo "======================================================================"
+		echo "= Starting backup process to $TARGET"
+		echo "======================================================================"
+		echo ""
+
+		setDefaults
+
+		if [ ! -d "$TARGET" ] ; then
+			echo "$TARGET does not exist yet, creating"
+			mkdir -p "$TARGET"
+		fi
+
+		echo "Creating backup in $TARGET"
+
+		backupRancher $TARGET
+
+		if [ x"${MODE}" = x"INCREMENTAL" ] ; then
+			# Backup - copies innodb files and reads binary log while doing so
+			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
+				--incremental-basedir="${BASE_PATH}" \
+				--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+				--host "${MYSQL_HOST}" --port ${MYSQL_PORT}
+		else
+			# Backup - copies innodb files and reads binary log while doing so
+			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
+				--incremental-basedir=/data/backups/base\
+				--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+				--host "${MYSQL_HOST}" --port ${MYSQL_PORT}
+		fi
+
+		if [ x"${MODE}" = x"SIMPLE" ] ; then
+			echo "Mode is SIMPLE, preparing backups"
+
+			# First prepare - selfheal innodb and apply binary log to make it consistent
+			xtrabackup --prepare --target-dir="$TARGET"
+			# Second prepare - write logfiles for faster server startup
+			xtrabackup --prepare --target-dir="$TARGET"
+		fi
+		echo "$TARGET Done"
+
+		createRestoreService "$NAME"
+
+		if [ ! -z "${RUN_EVERY}" ] ; then
+
+			echo "Sleeping for ${RUN_EVERY} before starting again"
+			sleep "${RUN_EVERY}"
+
+		else
+
+			echo "Environment variable RUN_EVERY was not set, not looping"
+			RUNNING="false"
+
+		fi
+
+
+	done
+}
 
 case $1 in
 	backup)
 
-
-		RUNNING="true"
-		while [ x"$RUNNING" = x"true" ] ; do
-
-			DATE=$(date '+%Y-%m-%d-%H%M%S')
-			NAME="${DATE}"
-
-			if [ x"${MODE}" = x"FULL" ] ; then
-				echo "======================================================================"
-				echo "= Full backup process"
-				echo "======================================================================"
-				echo ""
-
-				NAME="full-${DATE}"
-			else if [ x"${MODE}" = x"INCREMENTAL" ] ; then
-				echo "======================================================================"
-				echo "= Incremental backup process"
-				echo "======================================================================"
-				echo ""
-				BASE_BACKUP="$(find_last_full_backup)"
-				BASE_PATH="${TARGET_PREFIX}/${BASE_BACKUP}"
-				NAME="full-${BASE_BACKUP}-inc-$DATE"
-				echo "Base backup: ${BASE_BACKUP}"
-				echo ""
-			fi
-
-			TARGET="${TARGET_PREFIX}/$NAME"
-
-			echo "======================================================================"
-			echo "= Starting backup process to $TARGET"
-			echo "======================================================================"
-			echo ""
-
-			setDefaults
-
-			if [ ! -d "$TARGET" ] ; then
-				echo "$TARGET does not exist yet, creating"
-				mkdir -p "$TARGET"
-			fi
-
-			echo "Creating backup in $TARGET"
-
-			backupRancher $TARGET
-
-			if [ x"${MODE}" = x"INCREMENTAL" ] ; then
-				# Backup - copies innodb files and reads binary log while doing so
-				xtrabackup --backup --datadir="$DATA_DIRECTORY" \
-					--incremental-basedir="${BASE_PATH}" \
-					--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
-					--host "${MYSQL_HOST}" --port ${MYSQL_PORT} \
-			else
-				# Backup - copies innodb files and reads binary log while doing so
-				xtrabackup --backup --datadir="$DATA_DIRECTORY" \
-					--incremental-basedir=/data/backups/base\
-					--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
-					--host "${MYSQL_HOST}" --port ${MYSQL_PORT} \
-			fi
-
-
-
-			if [ x"${MODE}" = x"SIMPLE" ] ; then
-				echo "Mode is SIMPLE, preparing backups"
-
-				# First prepare - selfheal innodb and apply binary log to make it consistent
-				xtrabackup --prepare --target-dir="$TARGET"
-				# Second prepare - write logfiles for faster server startup
-				xtrabackup --prepare --target-dir="$TARGET"
-			fi
-			echo "$TARGET Done"
-
-			createRestoreService "$NAME"
-
-			if [ ! -z "RUN_EVERY" ] ; then
-
-				echo "Sleeping for $RUN_EVERY before starting again"
-				sleep "$RUN_EVERY"
-
-			else
-
-				echo "Environment variable RUN_EVERY was not set, not looping"
-				RUNNING="false"
-
-			fi
-
-
-		done
-		;;
-
+		backup
+	;;
 	restore)
 		shift
 		TARGET="${TARGET_PREFIX}/$1"
