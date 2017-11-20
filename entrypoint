@@ -2,6 +2,14 @@
 
 set -e
 
+#
+# Backup Mode. Possible values:
+# - SIMPLE: Create ${TARGET_PREFIX}/${DATE}
+# - FULL: Create ${TARGET_PREFIX}/full-${DATE}
+# - INCREMENTAL: Create ${TARGET_PREFIX}/full-{LASTDATE}-inc-${DATE} based on the last full-${DATE}
+#
+MODE="${MODE:-SIMPLE}"
+
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
@@ -45,12 +53,11 @@ createRestoreService() {
 	curl http://rancher-metadata/2015-12-19/self/service/metadata/docker-compose \
 	 	> /tmp/docker-compose.yml.tpl
 
-	ESCAPED_RANCHER_URL=$(echo ${RANCHER_URL} | sed -e 's/[\/&]/\\&/g')
 	ALPHANUM_TARGET_BACKUP=$(echo ${TARGET_BACKUP} | sed -e 's/[^a-zA-Z0-9\-]//g')
 	sed \
 		-e "s~%%BACKUP%%~$TARGET_BACKUP~" \
 		-e "s~%%BACKUP_ALPHANUM%%~$ALPHANUM_TARGET_BACKUP~" \
-		-e "s~%%RANCHER_URL%%~$ESCAPED_RANCHER_URL~" \
+		-e "s~%%RANCHER_URL%%~$RANCHER_URL~" \
 		-e "s~%%RANCHER_KEY%%~$RANCHER_ACCESS_KEY~" \
 		-e "s~%%RANCHER_SECRET%%~$RANCHER_SECRET_KEY~" \
 		-e "s~%%BACKUP_VOLUME%%~$BACKUP_VOLUME~" \
@@ -99,14 +106,14 @@ setDefaults() {
 }
 
 backupRancher() {
-	
+
 	echo "Backing up rancher stack"
 
 	local METADATA_URL="http://rancher-metadata/2015-07-25"
 	local STACK=$(curl -s $METADATA_URL/self/service/links | sed 's/%2F.*//')
 	local SERVICE=$(curl -s $METADATA_URL/self/service/links | sed 's/[^%]*%2F//')
 	local TARGET_DIRECTORY="$1"
-  
+
 	if [ -z "$RANCHER_URL" -o -z "$RANCHER_ACCESS_KEY" -o -z "$RANCHER_SECRET_KEY" ] ; then
 		echo "No rancher access data set, not backing up {docker,rancher}-compose.yml files"
 		return
@@ -117,7 +124,7 @@ backupRancher() {
 		RANCHER_CLI_VERSION="v0.4.1"
 	fi
 
-	RANCHER_CLI_DIRECTORY="/opt/rancher/${RANCHER_CLI_VERSION}" 
+	RANCHER_CLI_DIRECTORY="/opt/rancher/${RANCHER_CLI_VERSION}"
 	if [ ! -d "$RANCHER_CLI_DIRECTORY" ] ; then
 		mkdir -p "$RANCHER_CLI_DIRECTORY"
 	fi
@@ -168,7 +175,9 @@ case $1 in
 
 
 			DATE=$(date '+%Y-%m-%d-%H%M%S')
-			TARGET="${TARGET_PREFIX}/$DATE"
+			NAME="${DATE}"
+
+			TARGET="${TARGET_PREFIX}/$NAME"
 
 			echo "======================================================================"
 			echo "= Starting backup process to $TARGET"
@@ -196,7 +205,7 @@ case $1 in
 			xtrabackup --prepare --target-dir="$TARGET"
 			echo "$TARGET Done"
 
-			createRestoreService "$DATE"
+			createRestoreService "$NAME"
 
 			if [ ! -z "RUN_EVERY" ] ; then
 
@@ -211,7 +220,7 @@ case $1 in
 			fi
 
 
-		done 
+		done
 		;;
 
 	restore)
@@ -268,6 +277,16 @@ case $1 in
 		rm -Rfv /var/lib/mysql/*
 		echo "Done"
 		;;
+	cleanup)
+		echo "======================================================================"
+		echo "= Clean up expired backups from $TARGET"
+		echo "======================================================================"
+		echo ""
+
+		FILES=( $(ls $TARGET/full-????-??-??) )
+
+		;;
+
 	run)
 		shift
 
