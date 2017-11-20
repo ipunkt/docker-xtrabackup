@@ -13,6 +13,11 @@ MODE="${MODE:-SIMPLE}"
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
+find_last_full_backup() {
+	FILES=( $(ls $TARGET/full-????-??-??) )
+	echo ${FILES[-1]}
+}
+
 download_rancher_compose() {
 
 	RANCHER_COMPOSE_VERSION="$1"
@@ -57,39 +62,40 @@ createRestoreService() {
 	sed \
 		-e "s~%%BACKUP%%~$TARGET_BACKUP~" \
 		-e "s~%%BACKUP_ALPHANUM%%~$ALPHANUM_TARGET_BACKUP~" \
-		-e "s~%%RANCHER_URL%%~$RANCHER_URL~" \
-		-e "s~%%RANCHER_KEY%%~$RANCHER_ACCESS_KEY~" \
-		-e "s~%%RANCHER_SECRET%%~$RANCHER_SECRET_KEY~" \
-		-e "s~%%BACKUP_VOLUME%%~$BACKUP_VOLUME~" \
-		-e "s~%%BACKUP_DRIVER%%~$BACKUP_DRIVER~" \
-		-e "s~%%STORAGEBOX_URL%%~$STORAGEBOX_URL~" \
-		-e "s~%%STORAGEBOX_USER%%~$STORAGEBOX_USER~" \
-		-e "s~%%STORAGEBOX_PASSWORD%%~$STORAGEBOX_PASSWORD~" \
+		-e "s~%%RANCHER_URL%%~${RANCHER_URL}~" \
+		-e "s~%%RANCHER_KEY%%~${RANCHER_ACCESS_KEY}~" \
+		-e "s~%%RANCHER_SECRET%%~${RANCHER_SECRET_KEY}~" \
+		-e "s~%%BACKUP_VOLUME%%~${BACKUP_VOLUME}~" \
+		-e "s~%%BACKUP_DRIVER%%~${BACKUP_DRIVER}~" \
+		-e "s~%%STORAGEBOX_URL%%~${STORAGEBOX_URL}~" \
+		-e "s~%%STORAGEBOX_USER%%~${STORAGEBOX_USER}~" \
+		-e "s~%%STORAGEBOX_PASSWORD%%~${STORAGEBOX_PASSWORD}~" \
 	  	/tmp/docker-compose.yml.tpl > /tmp/docker-compose.yml
-	download_rancher_compose $RANCHER_COMPOSE_VERSION
+	download_rancher_compose ${RANCHER_COMPOSE_VERSION}
 
-	echo "Using ${ANCHER_COMPOSE} as rancher-compose executable"
-	${RANCHER_COMPOSE} -p "$RESTORE_STACK" create
+	echo "Using ${RANCHER_COMPOSE} as rancher-compose executable"
+	${RANCHER_COMPOSE} -p "${RESTORE_STACK}" create
 
 	cd "$OLDDIR"
 }
 
 setDefaults() {
-	if [ -z "$MYSQL_USER" ] ; then
+	if [ -z "${MYSQL_USER}" ] ; then
 		echo "WARNING: Running with default user."
 	else
-		echo "Connecting as $MYSQL_USER"
-		USER=(--user "$MYSQL_USER")
+		echo "Connecting as ${MYSQL_USER}"
+		USER=(--user "${MYSQL_USER}")
 	fi
 
-	if [ -z "$MYSQL_PASSWORD" ] ; then
+	if [ -z "${MYSQL_PASSWORD}" ] ; then
 		echo "WARNING: Running without password."
 	else
 		echo "Connecting with password"
-		PASSWORD=(--password "$MYSQL_PASSWORD")
+		PASSWORD=(--password "${MYSQL_PASSWORD}")
 	fi
 
-	if [ -z "$MYSQL_HOST" ] ; then
+	if [ -z "${MYSQL_HOST}" ] ; then
+
 		echo "WARNING: Connecting to default host 'source', make sure to set links"
 		MYSQL_HOST="target"
 	else
@@ -171,11 +177,29 @@ case $1 in
 
 
 		RUNNING="true"
-		while [ "$RUNNING" = "true" ] ; do
-
+		while [ x"$RUNNING" = x"true" ] ; do
 
 			DATE=$(date '+%Y-%m-%d-%H%M%S')
 			NAME="${DATE}"
+
+			if [ x"${MODE}" = x"FULL" ] ; then
+				echo "======================================================================"
+				echo "= Full backup process"
+				echo "======================================================================"
+				echo ""
+
+				NAME="full-${DATE}"
+			else if [ x"${MODE}" = x"INCREMENTAL" ] ; then
+				echo "======================================================================"
+				echo "= Incremental backup process"
+				echo "======================================================================"
+				echo ""
+				BASE_BACKUP="$(find_last_full_backup)"
+				BASE_PATH="${TARGET_PREFIX}/${BASE_BACKUP}"
+				NAME="full-${BASE_BACKUP}-inc-$DATE"
+				echo "Base backup: ${BASE_BACKUP}"
+				echo ""
+			fi
 
 			TARGET="${TARGET_PREFIX}/$NAME"
 
@@ -195,14 +219,30 @@ case $1 in
 
 			backupRancher $TARGET
 
-			# Backup - copies innodb files and reads binary log while doing so
-			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
-				--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
-				--host "$MYSQL_HOST" --port $MYSQL_PORT \
+			if [ x"${MODE}" = x"INCREMENTAL" ] ; then
+				# Backup - copies innodb files and reads binary log while doing so
+				xtrabackup --backup --datadir="$DATA_DIRECTORY" \
+					--incremental-basedir="${BASE_PATH}" \
+					--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+					--host "${MYSQL_HOST}" --port ${MYSQL_PORT} \
+			else
+				# Backup - copies innodb files and reads binary log while doing so
+				xtrabackup --backup --datadir="$DATA_DIRECTORY" \
+					--incremental-basedir=/data/backups/base\
+					--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+					--host "${MYSQL_HOST}" --port ${MYSQL_PORT} \
+			fi
+
+
+
+			if [ x"${MODE}" = x"SIMPLE" ] ; then
+				echo "Mode is SIMPLE, preparing backups"
+
 				# First prepare - selfheal innodb and apply binary log to make it consistent
-			xtrabackup --prepare --target-dir="$TARGET"
-			# Second prepare - write logfiles for faster server startup
-			xtrabackup --prepare --target-dir="$TARGET"
+				xtrabackup --prepare --target-dir="$TARGET"
+				# Second prepare - write logfiles for faster server startup
+				xtrabackup --prepare --target-dir="$TARGET"
+			fi
 			echo "$TARGET Done"
 
 			createRestoreService "$NAME"
@@ -284,9 +324,8 @@ case $1 in
 		echo ""
 
 		FILES=( $(ls $TARGET/full-????-??-??) )
-
+		exit 0
 		;;
-
 	run)
 		shift
 
@@ -297,11 +336,11 @@ case $1 in
 
 		$*
 		echo "Done"
+		exit 0
 		;;
 	help)
 		shift
 		usage $*
-		exit 0
 		exit 0
 		;;
 	*)
