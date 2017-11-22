@@ -10,6 +10,19 @@ set -e
 #
 MODE="${MODE:-SIMPLE}"
 RUN_EVERY="${RUN_EVERY:-}"
+RESTORE_STACK="${RESTORE_STACK:-}"
+RANCHER_URL="${RANCHER_URL:-}"
+RANCHER_ACCESS_KEY="${RANCHER_ACCESS_KEY}"
+RANCHER_SECRET_KEY="${RANCHER_SECRET_KEY}"
+BACKUP_VOLUME="${BACKUP_VOLUME:-}"
+BACKUP_DRIVER="${BACKUP_DRIVER:-}"
+STORAGEBOX_URL="${STORAGEBOX_URL:-}"
+STORAGEBOX_USER="${STORAGEBOX_USER:-}"
+STORAGEBOX_PASSWORD="${STORAGEBOX_PASSWORD:-}"
+MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
+MYSQL_HOST="${MYSQL_HOST:-}"
+MYSQL_PORT="${MYSQL_PORT}"
+RANCHER_CLI_VERSION="${RANCHER_CLI_VERSION:-v0.4.1}"
 
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
@@ -43,7 +56,7 @@ createRestoreService() {
 
 	TARGET_BACKUP="$1"
 
-	if [ -z "$RESTORE_STACK" ] ; then
+	if [ -z "${RESTORE_STACK}" ] ; then
 		echo "RESTORE_STACK environment variable not set, not creating a restore service"
 		return
 	fi
@@ -124,11 +137,6 @@ backupRancher() {
 	if [ -z "$RANCHER_URL" -o -z "$RANCHER_ACCESS_KEY" -o -z "$RANCHER_SECRET_KEY" ] ; then
 		echo "No rancher access data set, not backing up {docker,rancher}-compose.yml files"
 		return
-	fi
-
-	if [ -z "$RANCHER_CLI_VERSION" ] ; then
-		echo "Defaulting to rancher-cli Version v0.4.1"
-		RANCHER_CLI_VERSION="v0.4.1"
 	fi
 
 	RANCHER_CLI_DIRECTORY="/opt/rancher/${RANCHER_CLI_VERSION}"
@@ -228,7 +236,6 @@ backup() {
 		else
 			# Backup - copies innodb files and reads binary log while doing so
 			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
-				--incremental-basedir=/data/backups/base\
 				--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
 				--host "${MYSQL_HOST}" --port ${MYSQL_PORT}
 		fi
@@ -343,7 +350,7 @@ case $1 in
 		;;
 	help)
 		shift
-		usage $*
+		usage
 		exit 0
 		;;
 	*)
