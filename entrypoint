@@ -368,7 +368,13 @@ restore_incremental() {
 		exit 1
 	fi
 
-	cp -rv "${BASE_BACKUP_PATH}" "${RESTORE_DIRECTORY}"
+	if cp -rv "${BASE_BACKUP_PATH}" "${RESTORE_DIRECTORY}" ; then
+		echo "Cp Success"
+	else
+		echo "Cp Failed"
+	fi
+	echo "Cp Ended"
+	exit
 
 	# Prepare the full backup
 	echo "Preparing ${BASE_BACKUP_NAME}"
