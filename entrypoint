@@ -368,13 +368,8 @@ restore_incremental() {
 		exit 1
 	fi
 
-	if cp -rv "${BASE_BACKUP_PATH}" "${RESTORE_DIRECTORY}" ; then
-		echo "Cp Success"
-	else
-		echo "Cp Failed"
-	fi
-	echo "Cp Ended"
-	exit
+	echo "Copying full backup"
+	cp -Rfv "${BASE_BACKUP_PATH}" "${RESTORE_DIRECTORY}"
 
 	# Prepare the full backup
 	echo "Preparing ${BASE_BACKUP_NAME}"
@@ -408,7 +403,7 @@ restore_full() {
 
 	# Copy the backup to a temporary restore directory. Otherwise the the backup would be prepared and it would no longer
 	# be possible to use it as base to restore incremental backups
-	cp -rv "${BACKUP_PATH}" "${RESTORE_DIRECTORY}"
+	cp -Rfv "${BACKUP_PATH}" "${RESTORE_DIRECTORY}"
 
 	# Prepare the backup
 	xtrabackup --prepare --target-dir="$RESTORE_DIRECTORY"
