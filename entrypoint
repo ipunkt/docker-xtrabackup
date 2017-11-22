@@ -8,7 +8,7 @@ set -e
 # - FULL: Create ${TARGET_PREFIX}/full-${DATE}
 # - INCREMENTAL: Create ${TARGET_PREFIX}/full-{LASTDATE}-inc-${DATE} based on the last full-${DATE}
 #
-MODE="${MODE:-SIMPLE}"
+BACKUP_MODE="${BACKUP_MODE:-SIMPLE}"
 RUN_EVERY="${RUN_EVERY:-}"
 RESTORE_STACK="${RESTORE_STACK:-}"
 RANCHER_URL="${RANCHER_URL:-}"
@@ -24,14 +24,14 @@ MYSQL_HOST="${MYSQL_HOST:-}"
 MYSQL_PORT="${MYSQL_PORT}"
 RANCHER_CLI_VERSION="${RANCHER_CLI_VERSION:-v0.4.1}"
 
-TARGET_PREFIX="/target"
+BACKUP_DIRECTORY="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
 #
 # Find the directory name of the latest full backup
 #
 find_last_full_backup() {
-	FILES=( $(ls -d "${TARGET_PREFIX}/"full-????-??-??-??????) )
+	FILES=( $(ls -d "${BACKUP_DIRECTORY}/"full-????-??-??-??????) )
 	basename ${FILES[-1]}
 }
 
@@ -55,29 +55,17 @@ download_rancher_compose() {
 	fi
 }
 
-createRestoreService() {
+retrieveDockerCompose() {
 
-	TARGET_BACKUP="$1"
-
-	if [ -z "${RESTORE_STACK}" ] ; then
-		echo "RESTORE_STACK environment variable not set, not creating a restore service"
-		return
-	fi
-
-	echo "======================================================================"
-	echo "= Creating restore service for $TARGET_BACKUP"
-	echo "======================================================================"
-	echo ""
-
-	OLDDIR=$(pwd)
+	BACKUP_NAME="$1"
 
 	cd /tmp/
 	curl http://rancher-metadata/2015-12-19/self/service/metadata/docker-compose \
 	 	> /tmp/docker-compose.yml.tpl
 
-	ALPHANUM_TARGET_BACKUP=$(echo ${TARGET_BACKUP} | sed -e 's/[^a-zA-Z0-9\-]//g')
+	ALPHANUM_TARGET_BACKUP=$(echo ${BACKUP_NAME} | sed -e 's/[^a-zA-Z0-9\-]//g')
 	sed \
-		-e "s~%%BACKUP%%~$TARGET_BACKUP~" \
+		-e "s~%%BACKUP%%~$BACKUP_NAME~" \
 		-e "s~%%BACKUP_ALPHANUM%%~$ALPHANUM_TARGET_BACKUP~" \
 		-e "s~%%RANCHER_URL%%~${RANCHER_URL}~" \
 		-e "s~%%RANCHER_KEY%%~${RANCHER_ACCESS_KEY}~" \
@@ -88,10 +76,57 @@ createRestoreService() {
 		-e "s~%%STORAGEBOX_USER%%~${STORAGEBOX_USER}~" \
 		-e "s~%%STORAGEBOX_PASSWORD%%~${STORAGEBOX_PASSWORD}~" \
 	  	/tmp/docker-compose.yml.tpl > /tmp/docker-compose.yml
+}
+
+createRestoreService() {
+
+	BACKUP_NAME="$1"
+
+	if [ -z "${RESTORE_STACK}" ] ; then
+		echo "RESTORE_STACK environment variable not set, not creating a restore service"
+		return
+	fi
+
+	echo "======================================================================"
+	echo "= Creating restore service for $BACKUP_NAME"
+	echo "======================================================================"
+	echo ""
+
+	OLDDIR=$(pwd)
+
+	retrieveDockerCompose "${BACKUP_NAME}"
+
 	download_rancher_compose ${RANCHER_COMPOSE_VERSION}
 
 	echo "Using ${RANCHER_COMPOSE} as rancher-compose executable"
 	${RANCHER_COMPOSE} -p "${RESTORE_STACK}" create
+
+	cd "$OLDDIR"
+}
+
+removeRestoreService() {
+
+	BACKUP_NAME="$1"
+
+	if [ -z "${RESTORE_STACK}" ] ; then
+		echo "RESTORE_STACK environment variable not set, not removing a restore service"
+		return
+	fi
+
+	echo "======================================================================"
+	echo "= Creating restore service for ${BACKUP_NAME}"
+	echo "======================================================================"
+	echo ""
+
+	OLDDIR=$(pwd)
+
+	cd /tmp/
+
+	retrieveDockerCompose "${BACKUP_NAME}"
+	download_rancher_compose ${RANCHER_COMPOSE_VERSION}
+
+	echo "Using ${RANCHER_COMPOSE} as rancher-compose executable"
+	${RANCHER_COMPOSE} -p "${RESTORE_STACK}" rm
 
 	cd "$OLDDIR"
 }
@@ -162,7 +197,7 @@ usage() {
 	echo "======================================================================"
 	echo "= Usage"
 	echo "======================================================================"
-	echo "docker run ipunktbs/xtrabackup -v "name-backup-directory:${TARGET_PREFIX}" [COMMAND]"
+	echo "docker run ipunktbs/xtrabackup -v "name-backup-directory:${BACKUP_DIRECTORY}" [COMMAND]"
 	echo ""
 	echo "The ipunktbs/xtrabackup docker image tries to provide percona xtrabackup for use in rancher environments"
 	echo ""
@@ -172,12 +207,12 @@ usage() {
 	echo "= Commands"
 	echo "======================================================================"
 	echo "- backup"
-	echo "  Does a backup, prepare, prepare cycle from /var/lib/mysql to ${TARGET_PREFIX}/YY-mm-dd-HH_ii"
+	echo "  Does a backup, prepare, prepare cycle from /var/lib/mysql to ${BACKUP_DIRECTORY}/YY-mm-dd-HH_ii"
 	echo "  If the environment variable RUN_EVERY is set then backups will continue to be made, with"
 	echo " 'sleep \$RUN_EVERY' in between"
 	echo ""
 	echo "- restore YY-mm-dd-HH_ii"
-	echo "  Does a copy-back ${TARGET_PREFIX}/YY-mm-dd-HH_ii to /var/lib/mysql"
+	echo "  Does a copy-back ${BACKUP_DIRECTORY}/YY-mm-dd-HH_ii to /var/lib/mysql"
 	echo ""
 	echo "- run COMMAND"
 	echo "  Runs the given command within the container."
@@ -189,71 +224,71 @@ backup() {
 	while [ x"$RUNNING" = x"true" ] ; do
 
 		DATE=$(date '+%Y-%m-%d-%H%M%S')
-		NAME="${DATE}"
+		BACKUP_NAME="${DATE}"
 
-		if [ x"${MODE}" = x"FULL" ] ; then
+		if [ x"${BACKUP_MODE}" = x"FULL" ] ; then
 			echo "======================================================================"
 			echo "= Full backup process"
 			echo "======================================================================"
 			echo ""
 
-			NAME="full-${DATE}"
+			BACKUP_NAME="full-${DATE}"
 		fi
 
-		if [ x"${MODE}" = x"INCREMENTAL" ] ; then
+		if [ x"${BACKUP_MODE}" = x"INCREMENTAL" ] ; then
 			echo "======================================================================"
 			echo "= Incremental backup process"
 			echo "======================================================================"
 			echo ""
-			BASE_BACKUP="$(find_last_full_backup)"
-			BASE_PATH="${TARGET_PREFIX}/${BASE_BACKUP}"
-			NAME="${BASE_BACKUP}-inc-$DATE"
-			echo "Base backup: ${BASE_BACKUP}"
+			BASE_BACKUP_NAME="$(find_last_full_backup)"
+			BASE_BACKUP_PATH="${BACKUP_DIRECTORY}/${BASE_BACKUP_NAME}"
+			BACKUP_NAME="${BASE_BACKUP_NAME}-inc-$DATE"
+			echo "Base backup: ${BASE_BACKUP_NAME}"
 			echo ""
 		fi
 
-		TARGET="${TARGET_PREFIX}/$NAME"
+		BACKUP_PATH="${BACKUP_DIRECTORY}/$BACKUP_NAME"
 
 		echo "======================================================================"
-		echo "= Starting backup process to $TARGET"
+		echo "= Starting backup process to $BACKUP_PATH"
 		echo "======================================================================"
 		echo ""
 
 		setDefaults
 
-		if [ ! -d "$TARGET" ] ; then
-			echo "$TARGET does not exist yet, creating"
-			mkdir -p "$TARGET"
+		if [ ! -d "$BACKUP_PATH" ] ; then
+			echo "$BACKUP_PATH does not exist yet, creating"
+			mkdir -p "$BACKUP_PATH"
 		fi
 
-		echo "Creating backup in $TARGET"
+		echo "Creating backup in $BACKUP_PATH"
 
-		backupRancher $TARGET
+		backupRancher $BACKUP_PATH
 
-		if [ x"${MODE}" = x"INCREMENTAL" ] ; then
+		if [ x"${BACKUP_MODE}" = x"INCREMENTAL" ] ; then
 			# Backup - copies innodb files and reads binary log while doing so
 			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
-				--incremental-basedir="${BASE_PATH}" \
-				--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+				--incremental-basedir="${BASE_BACKUP_PATH}" \
+				--target-dir="$BACKUP_PATH" ${USER[@]} ${PASSWORD[@]} \
 				--host "${MYSQL_HOST}" --port ${MYSQL_PORT}
 		else
 			# Backup - copies innodb files and reads binary log while doing so
 			xtrabackup --backup --datadir="$DATA_DIRECTORY" \
-				--target-dir="$TARGET" ${USER[@]} ${PASSWORD[@]} \
+				--target-dir="$BACKUP_PATH" ${USER[@]} ${PASSWORD[@]} \
 				--host "${MYSQL_HOST}" --port ${MYSQL_PORT}
 		fi
 
-		if [ x"${MODE}" = x"SIMPLE" ] ; then
+		if [ x"${BACKUP_MODE}" = x"SIMPLE" ] ; then
 			echo "Mode is SIMPLE, preparing backups"
 
 			# First prepare - selfheal innodb and apply binary log to make it consistent
-			xtrabackup --prepare --target-dir="$TARGET"
+			xtrabackup --prepare --target-dir="$BACKUP_PATH"
 			# Second prepare - write logfiles for faster server startup
-			xtrabackup --prepare --target-dir="$TARGET"
+			xtrabackup --prepare --target-dir="$BACKUP_PATH"
 		fi
-		echo "$TARGET Done"
+		echo "$BACKUP_PATH Done"
 
-		createRestoreService "$NAME"
+		createRestoreService "$BACKUP_NAME"
 
 		if [ ! -z "${RUN_EVERY}" ] ; then
 
@@ -271,47 +306,183 @@ backup() {
 	done
 }
 
+#
+# Input:
+# - $1 Incremental Backup directory
+# Output:
+# - Full backup which is the base of the incremental backup
+#
+parse_full_backup_base() {
+	sed 's~^\(full-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]\).*~\1~' <<< "$1"
+}
+
+#
+# Parameter
+# $1 - TARGET_PREFIX - The prefix(directory) in which the NAME directory lies
+# $2 - NAME - The name of the backup to be restored
+# $3 - RESTORE_DIRECTORY - the temporary directory in which the backup should be restored
+#
+#
+restore_incremental() {
+
+	local BACKUP_DIRECTORY="$1"
+	local BACKUP_NAME="$2"
+	local RESTORE_DIRECTORY="$3"
+
+	echo "======================================================================"
+	echo "= Incremental full backup ${BACKUP_PATH}"
+	echo "======================================================================"
+	echo ""
+
+
+	BASE_BACKUP_NAME="$(parse_full_backup_base ${BACKUP_NAME})"
+
+	BASE_BACKUP_PATH="${BACKUP_DIRECTORY}/${BASE_BACKUP_NAME}"
+
+	# Copy the full backup - preparing incremental backups would otherwise overwrite the full backup
+	if [ ! -d "${BASE_BACKUP_PATH}" ] ; then
+		echo "E> Base backup ${BASE_BACKUP_PATH} does not exist. Aborting."
+		exit 1
+	fi
+
+	cp -rv "${BASE_BACKUP_PATH}" "${RESTORE_DIRECTORY}"
+
+	# Prepare the full backup
+	xtrabackup --prepare --apply-log-only --target-dir="$RESTORE_DIRECTORY"
+
+	# apply the incremental backup
+	xtrabackup --prepare --target-dir="$RESTORE_DIRECTORY" --incremental-dir="${BACKUP_DIRECTORY}/${BACKUP_PATH}"
+
+	# copying back the prepared directory to the data directory is done in restore() as it is a shared step
+}
+
+
+#
+# Restore a full backup
+#
+restore_full() {
+
+	local BACKUP_DIRECTORY="$1"
+	local BACKUP_NAME="$2"
+	local RESTORE_DIRECTORY="$3"
+	local BACKUP_PATH="${BACKUP_DIRECTORY}/${BACKUP_NAME}"
+
+	echo "======================================================================"
+	echo "= Restoring full backup ${BACKUP_PATH}"
+	echo "======================================================================"
+	echo ""
+
+	# Copy the backup to a temporary restore directory. Otherwise the the backup would be prepared and it would no longer
+	# be possible to use it as base to restore incremental backups
+	cp -rv "${BACKUP_PATH}" "${RESTORE_DIRECTORY}"
+
+	# Prepare the backup
+	xtrabackup --prepare --target-dir="$RESTORE_DIRECTORY"
+
+	# copying back the prepared directory to the data directory is done in restore() as it is a shared step
+}
+
+#
+# Restore $1
+#
+# Parameter
+# $1 - BACKUP_DIRECTORY
+# $2 - BACKUP_NAME
+#
+#
+restore() {
+
+	local BACKUP_DIRECTORY="$1"
+	local BACKUP_NAME="$2"
+	local BACKUP_PATH="${BACKUP_DIRECTORY}/${BACKUP_NAME}"
+
+	echo "======================================================================"
+	echo "= Starting restore process from ${BACKUP_PATH}"
+	echo "======================================================================"
+	echo ""
+
+	if [ -z "$BACKUP_NAME" ] ; then
+
+		usage
+
+		echo "E> Error: no target backup given to"
+		exit 1
+	fi
+
+	if [ ! -d "${BACKUP_PATH}" ] ; then
+		echo "E> Directory '${BACKUP_PATH}' does not exist. Backup restore failed."
+		exit 2
+	fi
+
+	# Create the TEMPORARY_RESTORE_PATH and make sure it is empty
+	TEMPORARY_RESTORE_PATH="/tmp/${BACKUP_NAME}"
+	if [ -d "${TEMPORARY_RESTORE_PATH}" ] ; then
+		echo "Restore directory ${TEMPORARY_RESTORE_PATH} already exists. Deleting"
+		rm -Rf "${TEMPORARY_RESTORE_PATH}"
+	fi
+
+	local REGEX='^full-.*-inc-.*'
+	if [[ "${BACKUP_NAME}" =~ $REGEX ]] ; then
+		restore_incremental "$BACKUP_DIRECTORY" "$BACKUP_NAME" "${TEMPORARY_RESTORE_PATH}"
+	else
+		restore_full "$BACKUP_DIRECTORY" "${BACKUP_NAME}" "${TEMPORARY_RESTORE_PATH}"
+	fi
+
+	# Copy back the prepared data
+	xtrabackup --copy-back --datadir="$DATA_DIRECTORY" --target-dir="${TEMPORARY_RESTORE_PATH}"
+	echo "Done"
+
+	exit 0
+}
+
+get_backup_date() {
+	local BACKUP_NAME="$1"
+
+	sed 's~full-\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\)-[0-9][0-9][0-9][0-9][0-9][0-9]~\1~' <<< "${BACKUP_NAME}"
+}
+
+cleanup() {
+	LATEST_BACKUP="$(find_last_full_backup)"
+
+	echo "======================================================================"
+	echo "= Starting cleanup process based on ${LATEST_BACKUP}"
+	echo "======================================================================"
+	echo ""
+
+	BACKUP_DATE="$(get_backup_date ${LATEST_BACKUP})"
+	CLEANUP_DATE_PREFIX="$(date "+full-%Y-%m-%d" -d "${BACKUP_DATE} - 4 weeks")"
+
+	FULL_BACKUP_PATH="$(ls -d "${BACKUP_DIRECTORY}/${CLEANUP_DATE_PREFIX}"-??????)"
+	FULL_BACKUP_NAME=$(basename  ${FULL_BACKUP_PATH})
+
+	echo "Removing:"
+	ls -d "${FULL_BACKUP_PATH}"*
+	rm -Rfv "${FULL_BACKUP_PATH}-"*
+
+	removeRestoreService "${FULL_BACKUP_NAME}"
+}
+
 case $1 in
 	backup)
 
 		backup
 	;;
 	restore)
+
 		shift
-		TARGET="${TARGET_PREFIX}/$1"
-
-		echo "======================================================================"
-		echo "= Starting restore process from $TARGET"
-		echo "======================================================================"
-		echo ""
-
-		if [ -z "$1" ] ; then
-
-			usage
-
-			echo "E> Error: no target backup given to"
-			exit 1
-		fi
-
-		if [ ! -d "$TARGET" ] ; then
-			echo "E> Directory '$TARGET' does not exist. Backup restore failed."
-			exit 2
-		fi
-
-		xtrabackup --copy-back --datadir="$DATA_DIRECTORY" --target-dir="$TARGET"
-		echo "Done"
+		restore "${BACKUP_DIRECTORY}" $1
 
 		;;
 	create)
 		shift
-		TARGET="$1"
+		BACKUP_PATH="$1"
 
 		echo "======================================================================"
-		echo "= Creating restore service from $TARGET"
+		echo "= Creating restore service from $BACKUP_PATH"
 		echo "======================================================================"
 		echo ""
 
-		createRestoreService "$TARGET"
+		createRestoreService "$BACKUP_PATH"
 		;;
 
 	clear)
@@ -332,11 +503,11 @@ case $1 in
 		;;
 	cleanup)
 		echo "======================================================================"
-		echo "= Clean up expired backups from $TARGET"
+		echo "= Clean up expired backups from ${BACKUP_PATH}"
 		echo "======================================================================"
 		echo ""
 
-		FILES=( $(ls -d $TARGET/full-????-??-??-??????) )
+		cleanup
 		exit 0
 		;;
 	run)
