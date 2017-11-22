@@ -1,5 +1,10 @@
 #!/bin/bash
 
+DEBUG=${DEBUG:-}
+if [ x"$DEBUG" = x"ECHO" ] ; then
+   set -x
+fi
+
 set -e
 
 #
@@ -32,7 +37,10 @@ DATA_DIRECTORY="/var/lib/mysql"
 #
 find_last_full_backup() {
 	FILES=( $(ls -d "${BACKUP_DIRECTORY}/"full-????-??-??-??????) )
+
 	basename ${FILES[-1]}
+
+	return
 }
 
 download_rancher_compose() {
@@ -53,6 +61,8 @@ download_rancher_compose() {
 		chmod +x "$TARGET_RANCHER_COMPOSE"
 		echo "Installed Rancher compose $RANCHER_COMPOSE_VERSION to $TARGET_RANCHER_COMPOSE"
 	fi
+
+	return
 }
 
 retrieveDockerCompose() {
@@ -60,8 +70,7 @@ retrieveDockerCompose() {
 	BACKUP_NAME="$1"
 
 	cd /tmp/
-	curl http://rancher-metadata/2015-12-19/self/service/metadata/docker-compose \
-	 	> /tmp/docker-compose.yml.tpl
+	curl -o /tmp/docker-compose.yml.tpl http://rancher-metadata/2015-12-19/self/service/metadata/docker-compose
 
 	ALPHANUM_TARGET_BACKUP=$(echo ${BACKUP_NAME} | sed -e 's/[^a-zA-Z0-9\-]//g')
 	sed \
@@ -76,6 +85,8 @@ retrieveDockerCompose() {
 		-e "s~%%STORAGEBOX_USER%%~${STORAGEBOX_USER}~" \
 		-e "s~%%STORAGEBOX_PASSWORD%%~${STORAGEBOX_PASSWORD}~" \
 	  	/tmp/docker-compose.yml.tpl > /tmp/docker-compose.yml
+
+	return
 }
 
 createRestoreService() {
@@ -102,6 +113,8 @@ createRestoreService() {
 	${RANCHER_COMPOSE} -p "${RESTORE_STACK}" create
 
 	cd "$OLDDIR"
+
+	return
 }
 
 removeRestoreService() {
@@ -129,6 +142,8 @@ removeRestoreService() {
 	${RANCHER_COMPOSE} -p "${RESTORE_STACK}" rm
 
 	cd "$OLDDIR"
+
+	return
 }
 
 setDefaults() {
@@ -161,6 +176,7 @@ setDefaults() {
 		echo "Connecting to port $MYSQL_PORT"
 	fi
 
+	return
 }
 
 backupRancher() {
@@ -191,6 +207,8 @@ backupRancher() {
 	$RANCHER_CLI_DIRECTORY/rancher export "${STACK}"
 	cp ${STACK}/{docker,rancher}-compose.yml "${TARGET_DIRECTORY}/"
 	echo "{\"stack\":\"${STACK}\",\"service\":\"${SERVICE}\"}" > "${TARGET_DIRECTORY}/backup.json"
+
+	return
 }
 
 usage() {
@@ -216,6 +234,8 @@ usage() {
 	echo ""
 	echo "- run COMMAND"
 	echo "  Runs the given command within the container."
+
+	exit 0
 }
 
 backup() {
@@ -304,6 +324,8 @@ backup() {
 
 
 	done
+
+	exit 0
 }
 
 #
@@ -314,6 +336,7 @@ backup() {
 #
 parse_full_backup_base() {
 	sed 's~^\(full-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]\).*~\1~' <<< "$1"
+	return
 }
 
 #
@@ -348,12 +371,17 @@ restore_incremental() {
 	cp -rv "${BASE_BACKUP_PATH}" "${RESTORE_DIRECTORY}"
 
 	# Prepare the full backup
+	echo "Preparing ${BASE_BACKUP_NAME}"
 	xtrabackup --prepare --apply-log-only --target-dir="$RESTORE_DIRECTORY"
 
 	# apply the incremental backup
+	echo "Preparing ${BACKUP_NAME}"
 	xtrabackup --prepare --target-dir="$RESTORE_DIRECTORY" --incremental-dir="${BACKUP_DIRECTORY}/${BACKUP_PATH}"
 
+	echo "Done preparing"
 	# copying back the prepared directory to the data directory is done in restore() as it is a shared step
+
+	return
 }
 
 
@@ -380,6 +408,8 @@ restore_full() {
 	xtrabackup --prepare --target-dir="$RESTORE_DIRECTORY"
 
 	# copying back the prepared directory to the data directory is done in restore() as it is a shared step
+
+	return
 }
 
 #
@@ -439,6 +469,8 @@ get_backup_date() {
 	local BACKUP_NAME="$1"
 
 	sed 's~full-\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\)-[0-9][0-9][0-9][0-9][0-9][0-9]~\1~' <<< "${BACKUP_NAME}"
+
+	return
 }
 
 cleanup() {
@@ -460,6 +492,8 @@ cleanup() {
 	rm -Rfv "${FULL_BACKUP_PATH}-"*
 
 	removeRestoreService "${FULL_BACKUP_NAME}"
+
+	return
 }
 
 case $1 in
