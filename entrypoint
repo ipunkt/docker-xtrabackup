@@ -351,6 +351,7 @@ restore_incremental() {
 	local BACKUP_DIRECTORY="$1"
 	local BACKUP_NAME="$2"
 	local RESTORE_DIRECTORY="$3"
+	local BACKUP_PATH="${BACKUP_DIRECTORY}/${BACKUP_NAME}"
 
 	echo "======================================================================"
 	echo "= Incremental full backup ${BACKUP_PATH}"
@@ -377,7 +378,7 @@ restore_incremental() {
 
 	# apply the incremental backup
 	echo "Preparing ${BACKUP_NAME}"
-	xtrabackup --prepare --target-dir="$RESTORE_DIRECTORY" --incremental-dir="${BACKUP_DIRECTORY}/${BACKUP_PATH}"
+	xtrabackup --prepare --target-dir="$RESTORE_DIRECTORY" --incremental-dir="${BACKUP_PATH}"
 
 	echo "Done preparing"
 	# copying back the prepared directory to the data directory is done in restore() as it is a shared step
