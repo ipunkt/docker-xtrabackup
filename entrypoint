@@ -27,9 +27,12 @@ RANCHER_CLI_VERSION="${RANCHER_CLI_VERSION:-v0.4.1}"
 TARGET_PREFIX="/target"
 DATA_DIRECTORY="/var/lib/mysql"
 
+#
+# Find the directory name of the latest full backup
+#
 find_last_full_backup() {
 	FILES=( $(ls -d "${TARGET_PREFIX}/"full-????-??-??-??????) )
-	echo ${FILES[-1]}
+	basename ${FILES[-1]}
 }
 
 download_rancher_compose() {
@@ -204,7 +207,7 @@ backup() {
 			echo ""
 			BASE_BACKUP="$(find_last_full_backup)"
 			BASE_PATH="${TARGET_PREFIX}/${BASE_BACKUP}"
-			NAME="full-${BASE_BACKUP}-inc-$DATE"
+			NAME="${BASE_BACKUP}-inc-$DATE"
 			echo "Base backup: ${BASE_BACKUP}"
 			echo ""
 		fi
