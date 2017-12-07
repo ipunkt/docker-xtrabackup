@@ -373,6 +373,10 @@ restore_incremental() {
 	echo "Copying full backup"
 	cp -Rfv "${BASE_BACKUP_PATH}" "${RESTORE_DIRECTORY}"
 
+	#
+	# Copying the incremental backup. Xtrabackup accesses a lot of files at the same time. Backups are usually on a slow
+	# medium which might not allow such access
+	#
 	echo "Copying incremental Backup"
 	cp -Rfv "${BACKUP_PATH}" "${TEMPORARY_BACKUP_PATH}"
 
