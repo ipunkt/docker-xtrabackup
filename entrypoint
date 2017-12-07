@@ -352,7 +352,7 @@ restore_incremental() {
 	local BACKUP_NAME="$2"
 	local RESTORE_DIRECTORY="$3"
 	local BACKUP_PATH="${BACKUP_DIRECTORY}/${BACKUP_NAME}"
-	local BACKUP_INCREMENT_PATH="${BACKUP_PATH}-inc1"
+	local BACKUP_INCREMENT_PATH="/tmp/${BACKUP_NAME}-inc1"
 
 	echo "======================================================================"
 	echo "= Incremental full backup ${BACKUP_PATH}"
