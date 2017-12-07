@@ -588,13 +588,13 @@ case $1 in
 		;;
 	remove)
 
-
+		shift
 		echo "======================================================================"
 		echo "= Removing backup $1"
 		echo "======================================================================"
 		echo ""
 
-		if [ -z "$2" ] ; then
+		if [ -z "$1" ] ; then
 			echo "Missing argument: Backup to remove"
 			exit 1
 		fi
