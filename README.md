@@ -35,6 +35,10 @@ command will prompt the container to print its usage information.
   cluster
 - run COMMAND
   Run the given command within the container
+- cleanup
+  Remove the full backup 4 weeks older than the last one
+- remove BACKUP
+  Remove the given full backup, its incremental childs and their respective restore services
 - help
   Print Usage
 

@@ -127,7 +127,7 @@ removeRestoreService() {
 	fi
 
 	echo "======================================================================"
-	echo "= Creating restore service for ${BACKUP_NAME}"
+	echo "= Removing restore service for ${BACKUP_NAME}"
 	echo "======================================================================"
 	echo ""
 
@@ -139,6 +139,9 @@ removeRestoreService() {
 	download_rancher_compose ${RANCHER_COMPOSE_VERSION}
 
 	echo "Using ${RANCHER_COMPOSE} as rancher-compose executable"
+	#
+	# This will not remove the whole stack as a custom docker-compose.yml is written with only this service in it
+	#
 	${RANCHER_COMPOSE} -p "${RESTORE_STACK}" rm
 
 	cd "$OLDDIR"
@@ -497,13 +500,30 @@ cleanup() {
 	FULL_BACKUP_PATH="$(ls -d "${BACKUP_DIRECTORY}/${CLEANUP_DATE_PREFIX}"-??????)"
 	FULL_BACKUP_NAME=$(basename  ${FULL_BACKUP_PATH})
 
-	echo "Removing:"
-	ls -d "${FULL_BACKUP_PATH}"*
-	rm -Rfv "${FULL_BACKUP_PATH}-"*
-
-	removeRestoreService "${FULL_BACKUP_NAME}"
+	remove ${FULL_BACKUP_NAME}
 
 	return
+}
+
+#
+# Remove the full backup given as $1, all its incremental backups and their respective services.
+#
+remove() {
+	FULL_BACKUP="$1"
+
+	echo "Removing:"
+	ls -d "${BACKUP_DIRECTORY}/${FULL_BACKUP}"*
+	exit 1
+
+	for BACKUP_DIRECTORY in "${BACKUP_DIRECTORY}/${FULL_BACKUP}"* ; do
+		BACKUP_NAME="$(basename $BACKUP_DIRECTORY)"
+
+		echo "Removing ${BACKUP_NAME} in ${BACKUP_DIRECTORY}"
+
+		rm -Rf "${BACKUP_DIRECTORY}"
+
+		removeRestoreService "${BACKUP_NAME}"
+	done
 }
 
 case $1 in
@@ -566,6 +586,21 @@ case $1 in
 		echo "Done"
 		exit 0
 		;;
+	remove)
+
+
+		echo "======================================================================"
+		echo "= Removing backup $1"
+		echo "======================================================================"
+		echo ""
+
+		if [ -z "$2" ] ; then
+			echo "Missing argument: Backup to remove"
+			exit 1
+		fi
+
+		remove $1
+
 	help)
 		shift
 		usage
