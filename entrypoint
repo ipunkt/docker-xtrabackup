@@ -600,7 +600,7 @@ case $1 in
 		fi
 
 		remove $1
-
+		;;
 	help)
 		shift
 		usage
