@@ -513,16 +513,15 @@ remove() {
 
 	echo "Removing:"
 	ls -d "${BACKUP_DIRECTORY}/${FULL_BACKUP}"*
-	exit 1
 
 	for BACKUP_DIRECTORY in "${BACKUP_DIRECTORY}/${FULL_BACKUP}"* ; do
 		BACKUP_NAME="$(basename $BACKUP_DIRECTORY)"
 
 		echo "Removing ${BACKUP_NAME} in ${BACKUP_DIRECTORY}"
 
-		rm -Rf "${BACKUP_DIRECTORY}"
-
 		removeRestoreService "${BACKUP_NAME}"
+
+		rm -Rf "${BACKUP_DIRECTORY}"
 	done
 }
 
