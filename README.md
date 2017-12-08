@@ -27,8 +27,13 @@ command will prompt the container to print its usage information.
 
 - backup
   Use xtrabackup to create a backup to /target/YY-mm-dd-HH\_ii
+  - Set environment variable `BACKUP_MODE=FULL` to create a backup to /target/full-YY-mm-dd-HH\_ii and do not prepare it
+  - Set environment variable `BACKUP_MODE=INCREMENTAL` to create an incremental backup based on the latest full backup found to
+    /target/full-FULL_BACKUP_TIMESTAMP-inc-YY-mm-dd-HH\_ii
 - restore BACKUP
   Attempts to restore the given BACKUP from /target/BACKUP
+  - If the regex `^full-.*-inc-.*` matches the backup name it is treated as incremental backup and the full backup
+    included in its name is restored before the incremental one.
 - clear
   Clears the backup directory in preparation for restoring a backup. This is
   separate from restore to allow this command to run on all hosts of a galera
