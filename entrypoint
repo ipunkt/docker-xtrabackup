@@ -509,7 +509,7 @@ cleanup() {
 	while [ "$index" -lt "${NUM_FULL_BACKUPS}" ] ; do
 		local BACKUP_NAME="${FULL_BACKUPS[$index]}"
 		echo "Removing $index: ${BACKUP_NAME}"
-		# remove ${BACKUP_NAME}
+		remove ${BACKUP_NAME}
 		index=$(( ++index ))
 	done
 
