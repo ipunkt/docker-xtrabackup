@@ -500,7 +500,7 @@ cleanup() {
 	echo "Found ${NUM_FULL_BACKUPS} full backups"
 	echo "Keeping ${KEEP_BACKUPS} backups"
 	if [ "${NUM_FULL_BACKUPS}" -le "${KEEP_BACKUPS}" ] ; then
-		echo "No more than ${KEEP_BACKUPS} found."
+		echo "No more than ${KEEP_BACKUPS} full backups found."
 		echo "Exiting."
 		exit 0
 	fi
