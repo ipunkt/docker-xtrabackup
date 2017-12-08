@@ -28,6 +28,7 @@ MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
 MYSQL_HOST="${MYSQL_HOST:-}"
 MYSQL_PORT="${MYSQL_PORT}"
 RANCHER_CLI_VERSION="${RANCHER_CLI_VERSION:-v0.4.1}"
+KEEP_BACKUPS="${KEEP_BACKUPS:-4}"
 
 BACKUP_DIRECTORY="/target"
 DATA_DIRECTORY="/var/lib/mysql"
@@ -487,20 +488,31 @@ get_backup_date() {
 }
 
 cleanup() {
-	LATEST_BACKUP="$(find_last_full_backup)"
-
 	echo "======================================================================"
-	echo "= Starting cleanup process based on ${LATEST_BACKUP}"
+	echo "= Starting cleanup process"
 	echo "======================================================================"
 	echo ""
 
-	BACKUP_DATE="$(get_backup_date ${LATEST_BACKUP})"
-	CLEANUP_DATE_PREFIX="$(date "+full-%Y-%m-%d" -d "${BACKUP_DATE} - 4 weeks")"
+	IFS='
+'
+	local FULL_BACKUPS=(find /mnt/backup/backup -mindepth 1 -maxdepth 1 -name 'full-????-??-??-??????' -printf '%f\n' | sort -d -r)
+	local NUM_FULL_BACKUPS="${#FULL_BACKUPS[@]}"
+	echo "Found ${NUM_FULL_BACKUPS} full backups"
+	echo "Keeping ${KEEP_BACKUPS} backups"
+	if [ "${NUM_FULL_BACKUPS}" -le "${KEEP_BACKUPS}" ] ; then
+		echo "No more than ${KEEP_BACKUPS} found."
+		echo "Exiting."
+		exit 0
+	fi
 
-	FULL_BACKUP_PATH="$(ls -d "${BACKUP_DIRECTORY}/${CLEANUP_DATE_PREFIX}"-??????)"
-	FULL_BACKUP_NAME=$(basename  ${FULL_BACKUP_PATH})
+	index="${KEEP_BACKUPS}"
+	while [ "$index" -lt "${NUM_FULL_BACKUPS}" ] ; do
+		local BACKUP_NAME="${FULL_BACKUPS[$index]}"
+		echo "Removing $index: ${BACKUP_NAME}"
+		# remove ${BACKUP_NAME}
+		index=$(( ++index ))
+	done
 
-	remove ${FULL_BACKUP_NAME}
 
 	return
 }
