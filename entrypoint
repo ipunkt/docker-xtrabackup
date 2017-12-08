@@ -521,19 +521,19 @@ cleanup() {
 # Remove the full backup given as $1, all its incremental backups and their respective services.
 #
 remove() {
-	FULL_BACKUP="$1"
+	local FULL_BACKUP="$1"
 
 	echo "Removing:"
 	ls -d "${BACKUP_DIRECTORY}/${FULL_BACKUP}"*
 
-	for BACKUP_DIRECTORY in "${BACKUP_DIRECTORY}/${FULL_BACKUP}"* ; do
-		BACKUP_NAME="$(basename $BACKUP_DIRECTORY)"
+	for BACKUP_PATH in "${BACKUP_DIRECTORY}/${FULL_BACKUP}"* ; do
+		local BACKUP_NAME="$(basename $BACKUP_PATH)"
 
-		echo "Removing ${BACKUP_NAME} in ${BACKUP_DIRECTORY}"
+		echo "Removing ${BACKUP_NAME} in ${BACKUP_PATH}"
 
 		removeRestoreService "${BACKUP_NAME}"
 
-		rm -Rf "${BACKUP_DIRECTORY}"
+		rm -Rf "${BACKUP_PATH}"
 	done
 }
 
