@@ -495,7 +495,7 @@ cleanup() {
 
 	IFS='
 '
-	local FULL_BACKUPS=( $(find "${BACKUP_DIRECTORY}" -mindepth 1 -maxdepth 1 -name 'full-????-??-??-??????' -printf '%f\n' | sort -d -r) )
+	local FULL_BACKUPS=( $(find "${BACKUP_DIRECTORY}" -mindepth 1 -maxdepth 1 -name 'full-????-??-??-??????' -printf '%f\n' | sort -d) )
 	local NUM_FULL_BACKUPS="${#FULL_BACKUPS[@]}"
 	echo "Found ${NUM_FULL_BACKUPS} full backups"
 	echo "Keeping ${KEEP_BACKUPS} backups"
